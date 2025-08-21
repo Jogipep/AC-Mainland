@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>⚽ Ausgeglichenes Team-Tool (v3 – kompatibel)</title>
+  <style>
+    :root{--bg:#f6f6f6;--fg:#0f172a;--muted:#64748b;--card:#ffffff;--accent:#10b981;--border:#e5e7eb;}
+    *{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial}
+    .container{max-width:1100px;margin:0 auto;padding:24px}
+    h1{font-size:28px;margin:0 0 4px}
+    h2{font-size:18px;margin:0 0 8px}
+    .muted{color:var(--muted);font-size:13px}
+    .grid{display:grid;gap:16px}
+    @media(min-width:900px){.grid-3{grid-template-columns:1fr 1fr 1fr}.grid-2{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,0.04);padding:16px}
+    input[type="text"], input[type="number"], select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:12px;outline:none}
+    button{appearance:none;border:none;border-radius:12px;padding:10px 12px;font-weight:600;cursor:pointer}
+    .btn{background:var(--accent);color:white}
+    .btn-ghost{background:white;border:1px solid var(--border);color:var(--fg)}
+    .btn-link{background:transparent;color:#2563eb;padding:0;border:none}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:8px;border-top:1px solid var(--border);text-align:left;font-size:14px}
+    thead th{background:#f3f4f6;position:sticky;top:0;z-index:1}
+    .scroll{max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+    .small{font-size:12px}
+    .warn{background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:12px;border-radius:12px}
+    .team{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+    .stat{color:var(--muted);font-size:13px}
+    .danger{color:#b91c1c}
+    .right{text-align:right}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚽ Ausgeglichenes Team-Tool <span class="muted">(v3)</span></h1>
+    <div class="muted">Offline, mobilfreundlich. Daten bleiben lokal gespeichert.</div>
+
+    <div class="grid grid-3" style="margin-top:16px">
+      <div class="card">
+        <h2>Spieler anlegen / bearbeiten</h2>
+        <form id="player-form">
+          <div style="display:grid;gap:8px;margin-top:8px">
+            <input id="f-name" type="text" placeholder="Name" autocomplete="off">
+            <div style="display:flex;gap:8px">
+              <select id="f-pos">
+                <option value="TW">TW</option><option value="ABW">ABW</option>
+                <option value="MF" selected>MF</option><option value="ST">ST</option>
+              </select>
+              <select id="f-skill">
+                <option value="1">1</option><option value="2" selected>2</option><option value="3">3</option>
+              </select>
+            </div>
+            <button class="btn" id="btn-save" type="submit">Spieler hinzufügen</button>
+            <button class="btn-ghost" id="btn-cancel" type="button" style="display:none">Abbrechen</button>
+          </div>
+        </form>
+        <div class="small muted" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">CSV/JSON Import: <code>name,position,skill</code></div>
+        <div class="toolbar" style="margin-top:8px">
+          <input type="file" id="file" accept=".csv,.json">
+          <button class="btn-link" id="btn-export-csv" type="button">CSV exportieren</button>
+          <button class="btn-link" id="btn-export-json" type="button">JSON exportieren</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Team‑Konfiguration</h2>
+        <div style="display:grid;gap:8px">
+          <label class="small">Anzahl Teams</label>
+          <input id="num-teams" type="number" min="1" value="2">
+          <label class="small">Teamgröße (Personen pro Team)</label>
+          <input id="team-size" type="number" min="1" value="5">
+          <button class="btn" id="btn-build" type="button">Teams erstellen</button>
+          <button class="btn-ghost" id="btn-reset" type="button">Ergebnis zurücksetzen</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Spieler suchen & Auswahl</h2>
+        <input id="filter" type="text" placeholder="Suche nach Name/Position/Können…" style="margin-bottom:8px">
+        <div class="toolbar">
+          <button class="btn-ghost" id="btn-sel-all" type="button">Alle sichtbar auswählen</button>
+          <button class="btn-ghost" id="btn-unsel-all" type="button">Auswahl aufheben</button>
+          <button class="btn-ghost" id="btn-clear" type="button">Alles leeren</button>
+        </div>
+        <div class="scroll" style="margin-top:8px">
+          <table id="tbl">
+            <thead><tr><th>✔</th><th>Name</th><th>Pos</th><th>Können</th><th></th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="small muted" id="sel-count" style="margin-top:6px">Ausgewählt: 0 Spieler</div>
+        <div class="small muted" id="total-count" style="margin-top:4px">Gesamt: 0 Spieler</div>
+      </div>
+    </div>
+
+    <div id="warnings" style="margin-top:16px"></div>
+    <div id="results" class="grid grid-2" style="margin-top:16px"></div>
+  </div>
+
+<script>
+(function(){
+  var STORAGE_KEY = "hobbyfussball_players_v1_plain";
+  function $(sel){ return document.querySelector(sel); }
+  function $all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  var state = { players: loadPlayers(), selected: {}, editing: null };
+
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function byName(a,b){ return a.name.localeCompare(b.name); }
+  function bySkillDesc(a,b){ return (b.skill-a.skill) || a.name.localeCompare(b.name); }
+
+  function savePlayers(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.players)); }catch(e){} }
+  function loadPlayers(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+
+  function renderPlayers(){
+    var tbody = $("#tbody");
+    var f = ($("#filter").value||"").trim().toLowerCase();
+    var list = state.players.filter(function(p){
+      return !f || p.name.toLowerCase().includes(f) || p.position.toLowerCase().includes(f) || String(p.skill).includes(f);
+    }).sort(byName);
+
+    tbody.innerHTML = "";
+    for(var i=0;i<list.length;i++){
+      var p = list[i];
+      var tr = document.createElement("tr");
+      tr.innerHTML = '<td><input type="checkbox" '+(state.selected[p.id] ? "checked": "")+' data-id="'+p.id+'" class="sel"></td>' +
+                     "<td>"+escapeHtml(p.name)+"</td>" +
+                     "<td>"+escapeHtml(p.position)+"</td>" +
+                     "<td>"+String(p.skill)+"</td>" +
+                     '<td class="right"><button class="btn-link edit" data-id="'+p.id+'">Bearbeiten</button> ' +
+                     '<button class="btn-link danger del" data-id="'+p.id+'">Löschen</button></td>';
+      tbody.appendChild(tr);
+    }
+    $("#sel-count").textContent = "Ausgewählt: " + Object.keys(state.selected).filter(function(k){return state.selected[k];}).length + " Spieler";
+    $("#total-count").textContent = "Gesamt: " + state.players.length + " Spieler";
+  }
+
+  function escapeHtml(s){ return String(s).replace(/[&<>\"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]; }); }
+
+  function teamStats(team){
+    var totalSkill = team.reduce(function(s,p){ return s+(p.skill||0); },0);
+    var counts = {TW:0,ABW:0,MF:0,ST:0};
+    team.forEach(function(p){ counts[p.position] = (counts[p.position]||0)+1; });
+    return { totalSkill: totalSkill, counts: counts, size: team.length };
+  }
+
+  function buildTeams(){
+    var N = Math.max(1, Number($("#num-teams").value||1));
+    var SIZE = Math.max(1, Number($("#team-size").value||1));
+    var chosen = state.players.filter(function(p){ return !!state.selected[p.id]; });
+    var warnings = [];
+    if(chosen.length === 0){ alert("Bitte Spieler auswählen."); return; }
+    if(chosen.length < N) warnings.push("Weniger ausgewählte Spieler ("+chosen.length+") als Teams ("+N+").");
+    if(chosen.length < N*SIZE) warnings.push("Es sind weniger Spieler ("+chosen.length+") als benötigt ("+(N*SIZE)+"). Teams werden unvollständig.");
+
+    var pool = chosen.slice().sort(bySkillDesc);
+    var teams = []; for(var t=0;t<N;t++) teams.push([]);
+
+    var keepers = pool.filter(function(p){ return p.position==="TW"; }).sort(bySkillDesc);
+    var others  = pool.filter(function(p){ return p.position!=="TW"; });
+    for(var i=0;i<keepers.length;i++){ var k = keepers[i]; var tIdx = i % N; if(teams[tIdx].length < SIZE) teams[tIdx].push(k); }
+
+    function currentScore(i){ return teams[i].reduce(function(s,p){ return s+p.skill; },0); }
+    others.forEach(function(p){
+      var bestIdx = -1, bestScore = Infinity, bestPosFit = -1, bestLen = 999;
+      for(var i=0;i<N;i++){
+        if(teams[i].length >= SIZE) continue;
+        var score = currentScore(i);
+        var counts = {}; teams[i].forEach(function(x){ counts[x.position] = (counts[x.position]||0)+1; });
+        var posFit = -(counts[p.position]||0);
+        var len = teams[i].length;
+        if(score < bestScore || (score===bestScore && (posFit>bestPosFit || (posFit===bestPosFit && len<bestLen)))){
+          bestIdx = i; bestScore = score; bestPosFit = posFit; bestLen = len;
+        }
+      }
+      if(bestIdx!==-1) teams[bestIdx].push(p);
+    });
+
+    var used = {}; teams.forEach(function(t){ t.forEach(function(p){ used[p.id]=true; }); });
+    var remaining = pool.filter(function(p){ return !used[p.id]; });
+    remaining.forEach(function(p){
+      var bestIdx = -1, bestScore = Infinity;
+      for(var i=0;i<N;i++){
+        if(teams[i].length >= SIZE) continue;
+        var score = teams[i].reduce(function(s,x){ return s+x.skill; },0);
+        if(score < bestScore){ bestScore = score; bestIdx = i; }
+      }
+      if(bestIdx!==-1) teams[bestIdx].push(p);
+    });
+
+    var withoutGK = teams.map(function(t,i){ return {i:i, hasGK:t.some(function(x){ return x.position==="TW"; })}; }).filter(function(x){ return !x.hasGK; });
+    if(withoutGK.length) warnings.push("Nicht genug Torhüter für alle Teams: Ohne TW → " + withoutGK.map(function(x){return x.i+1;}).join(", "));
+
+    renderWarnings(warnings);
+    var result = teams.map(function(t){ return { players: t.slice().sort(bySkillDesc), stats: teamStats(t) }; });
+    renderResults(result);
+  }
+
+  function renderWarnings(arr){
+    var box = $("#warnings");
+    if(!arr || !arr.length){ box.innerHTML = ""; return; }
+    var html = '<div class="warn"><strong>Hinweise</strong><ul style="margin:6px 0 0 18px">';
+    for(var i=0;i<arr.length;i++){ html += "<li>"+arr[i]+"</li>"; }
+    html += "</ul></div>";
+    box.innerHTML = html;
+  }
+
+  function renderResults(result){
+    var root = $("#results"); root.innerHTML = "";
+    if(!result) return;
+    for(var i=0;i<result.length;i++){
+      var t = result[i];
+      var el = document.createElement("div");
+      el.className = "team";
+      var rows = "";
+      for(var j=0;j<t.players.length;j++){
+        var p = t.players[j];
+        rows += "<tr><td>"+escapeHtml(p.name)+"</td><td>"+escapeHtml(p.position)+"</td><td>"+String(p.skill)+"</td></tr>";
+      }
+      el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+                      '<div style="font-weight:700">Team '+(i+1)+'</div>' +
+                      '<div class="stat">Skill-Summe: '+t.stats.totalSkill+' · Größe: '+t.stats.size+'</div></div>' +
+                      '<div class="stat" style="margin:4px 0 8px">TW: '+t.stats.counts.TW+' · ABW: '+t.stats.counts.ABW+' · MF: '+t.stats.counts.MF+' · ST: '+t.stats.counts.ST+'</div>' +
+                      '<table><thead><tr><th>Name</th><th>Pos</th><th>Können</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      root.appendChild(el);
+    }
+  }
+
+  // --- Events ---
+  document.getElementById("player-form").addEventListener("submit", function(e){
+    e.preventDefault();
+    var name = ($("#f-name").value||"").trim();
+    if(!name){ alert("Bitte Namen eingeben."); return; }
+    var position = ($("#f-pos").value||"MF").toUpperCase();
+    var skill = Math.max(1, Math.min(3, Number($("#f-skill").value||2)));
+    if(state.editing){
+      for(var i=0;i<state.players.length;i++){ if(state.players[i].id===state.editing){ state.players[i] = { id: state.players[i].id, name:name, position:position, skill:skill }; break; } }
+      state.editing = null; $("#btn-save").textContent = "Spieler hinzufügen"; $("#btn-cancel").style.display = "none";
+    }else{
+      state.players.push({ id: uid(), name: name, position: position, skill: skill });
+    }
+    savePlayers(); setForm(null); renderPlayers();
+  });
+
+  $("#tbody").addEventListener("change", function(e){
+    var el = e.target;
+    if(el && el.classList.contains("sel")){
+      var id = el.getAttribute("data-id");
+      state.selected[id] = !!el.checked;
+      $("#sel-count").textContent = "Ausgewählt: " + Object.keys(state.selected).filter(function(k){return state.selected[k];}).length + " Spieler";
+    }
+  });
+
+  $("#tbody").addEventListener("click", function(e){
+    var btn = e.target;
+    if(!btn) return;
+    var id = btn.getAttribute ? btn.getAttribute("data-id") : null;
+    if(!id) return;
+    if(btn.classList.contains("edit")){
+      var p = state.players.filter(function(x){ return x.id===id; })[0];
+      if(!p) return;
+      state.editing = id; setForm(p); $("#btn-save").textContent = "Änderungen speichern"; $("#btn-cancel").style.display = "inline-block";
+    }
+    if(btn.classList.contains("del")){
+      state.players = state.players.filter(function(x){ return x.id!==id; });
+      delete state.selected[id];
+      if(state.editing===id){ state.editing=null; setForm(null); $("#btn-save").textContent="Spieler hinzufügen"; $("#btn-cancel").style.display="none"; }
+      savePlayers(); renderPlayers();
+    }
+  });
+
+  $("#btn-cancel").addEventListener("click", function(){ state.editing = null; setForm(null); $("#btn-save").textContent = "Spieler hinzufügen"; $("#btn-cancel").style.display = "none"; });
+  $("#btn-sel-all").addEventListener("click", function(){ $all("#tbody input.sel").forEach(function(chk){ chk.checked=true; state.selected[chk.getAttribute("data-id")] = true; }); $("#sel-count").textContent = "Ausgewählt: " + Object.keys(state.selected).filter(function(k){return state.selected[k];}).length + " Spieler"; });
+  $("#btn-unsel-all").addEventListener("click", function(){ $all("#tbody input.sel").forEach(function(chk){ chk.checked=false; state.selected[chk.getAttribute("data-id")] = false; }); $("#sel-count").textContent = "Ausgewählt: " + Object.keys(state.selected).filter(function(k){return state.selected[k];}).length + " Spieler"; });
+  $("#btn-clear").addEventListener("click", function(){ state.selected = {}; renderPlayers(); });
+  $("#filter").addEventListener("input", renderPlayers);
+  $("#btn-build").addEventListener("click", buildTeams);
+  $("#btn-reset").addEventListener("click", function(){ $("#warnings").innerHTML=""; $("#results").innerHTML=""; });
+
+  $("#btn-export-json").addEventListener("click", function(){
+    var blob = new Blob([JSON.stringify(state.players, null, 2)], {type:"application/json"});
+    var url = URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download="spieler_datenbank.json"; a.click(); URL.revokeObjectURL(url);
+  });
+  $("#btn-export-csv").addEventListener("click", function(){
+    var header = ["name","position","skill"].join(",");
+    var rows = state.players.map(function(p){ return [p.name,p.position,p.skill].join(","); });
+    var csv = [header].concat(rows).join("\n");
+    var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download="spieler_datenbank.csv"; a.click(); URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("file").addEventListener("change", function(evt){
+    var file = evt.target.files && evt.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var text = String(reader.result||"");
+      if(/\\.json$/i.test(file.name)){
+        try{
+          var data = JSON.parse(text);
+          if(Array.isArray(data)){
+            for(var i=0;i<data.length;i++){ var p = data[i]; if(p && p.name){ state.players.push({ id: uid(), name: String(p.name).trim(), position: String(p.position||"MF").toUpperCase(), skill: Math.max(1, Math.min(3, Number(p.skill)||2)) }); } }
+            savePlayers(); renderPlayers();
+          }
+        }catch(e){ alert("JSON konnte nicht gelesen werden."); }
+      }else{ // CSV
+        var lines = text.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return !!l; });
+        if(!lines.length) return;
+        var h = lines[0];
+        var rows = lines.slice(1);
+        var cols = h.split(",").map(function(x){ return x.trim().toLowerCase(); });
+        var idxName = cols.indexOf("name");
+        var idxPos = cols.indexOf("position");
+        var idxSkill = cols.indexOf("skill");
+        for(var r=0;r<rows.length;r++){ var c = rows[r].split(","); var name = (c[idxName]||"").trim(); if(!name) continue; var position = String(c[idxPos]||"MF").toUpperCase(); var skill = Math.max(1, Math.min(3, Number(c[idxSkill]||2))); state.players.push({ id: uid(), name:name, position:position, skill:skill }); }
+        savePlayers(); renderPlayers();
+      }
+    };
+    reader.readAsText(file);
+    evt.target.value = "";
+  });
+
+  function setForm(p){ $("#f-name").value = p? p.name : ""; $("#f-pos").value = p? p.position : "MF"; $("#f-skill").value = p? p.skill : "2"; }
+  renderPlayers();
+})();
+</script>
+</body>
+</html>
